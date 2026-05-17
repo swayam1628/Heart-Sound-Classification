@@ -34,10 +34,15 @@ html, body, [data-testid="stAppViewContainer"] {
     font-family: 'DM Sans', sans-serif;
 }
 
-/* ── Hide ONLY Streamlit branding — NOT the sidebar toggle ── */
+/* ── Hide Streamlit branding ONLY ── */
 #MainMenu { visibility: hidden; }
-footer    { visibility: hidden; }
-[data-testid="stToolbar"] { visibility: hidden; }
+footer { visibility: hidden; }
+
+/* KEEP toolbar visible so sidebar toggle works */
+[data-testid="stToolbar"] {
+    right: 0.5rem !important;
+    visibility: visible !important;
+}
 
 /* ── Sidebar background ── */
 [data-testid="stSidebar"] {
