@@ -321,34 +321,34 @@ if uploaded_file is not None:
     # RESULT CARD
     # =========================================
 
-   st.markdown(f"""
-<div class="result-card">
+    st.markdown(f"""
+    <div class="result-card">
 
-    <div class="result-label">
-        🫀 Predicted Heart Condition
+        <div class="result-label">
+            🫀 Predicted Heart Condition
+        </div>
+
+        <div style="
+            font-size:60px;
+            font-weight:900;
+            color:#ffffff;
+            margin-top:20px;
+            margin-bottom:20px;
+            text-shadow:0 0 25px rgba(0,255,170,0.6);
+        ">
+            {predicted_label.upper()}
+        </div>
+
+        <div style="
+            font-size:24px;
+            color:#7CFFB2;
+            font-weight:600;
+        ">
+            Confidence Score: {confidence:.2f}%
+        </div>
+
     </div>
-
-    <div style="
-        font-size:60px;
-        font-weight:900;
-        color:#ffffff;
-        margin-top:20px;
-        margin-bottom:20px;
-        text-shadow:0 0 25px rgba(0,255,170,0.6);
-    ">
-        {predicted_label.upper()}
-    </div>
-
-    <div style="
-        font-size:24px;
-        color:#7CFFB2;
-        font-weight:600;
-    ">
-        Confidence Score: {confidence:.2f}%
-    </div>
-
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
     # =========================================
     # WAVEFORM
