@@ -44,6 +44,11 @@ html, body, [data-testid="stAppViewContainer"] {
 /* ── Hide Streamlit chrome ── */
 #MainMenu, footer, header { visibility: hidden; }
 
+/* ── Lock sidebar open — hide the collapse/expand toggle ── */
+[data-testid="collapsedControl"],
+button[kind="header"],
+[data-testid="stSidebarCollapseButton"] { display: none !important; }
+
 /* ── Hero banner ── */
 .hero {
     background: linear-gradient(135deg, #0a1628 0%, #0f2044 50%, #0a1628 100%);
