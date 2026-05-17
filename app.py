@@ -5,26 +5,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tempfile
 import joblib
-import pandas as pd
 from datetime import datetime
-from matplotlib.patches import Wedge
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
     Spacer,
-    Image,
     Table,
     TableStyle
 )
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import letter
-from reportlab.graphics.shapes import Drawing
-from reportlab.graphics.charts.barcharts import VerticalBarChart
 
-# =========================================
+# =====================================================
 # PAGE CONFIG
-# =========================================
+# =====================================================
 
 st.set_page_config(
     page_title="Heart Sound AI",
@@ -32,102 +27,100 @@ st.set_page_config(
     layout="wide"
 )
 
-# =========================================
+# =====================================================
 # CUSTOM CSS
-# =========================================
+# =====================================================
 
 st.markdown("""
 <style>
 
+html, body, [class*="css"] {
+    font-family: 'Segoe UI', sans-serif;
+}
+
 .stApp {
-    background: linear-gradient(to bottom right, #050816, #0b1120);
+    background: linear-gradient(to bottom right, #020617, #0f172a);
     color: white;
 }
 
 .main-title {
-    font-size: 48px;
-    font-weight: 800;
-    color: #7CFFB2;
+    font-size: 54px;
+    font-weight: 900;
     text-align: center;
-    margin-bottom: 5px;
+    color: #7CFFB2;
+    margin-top: 10px;
 }
 
 .sub-title {
     text-align: center;
     color: #cbd5e1;
-    font-size: 18px;
+    font-size: 20px;
+    margin-bottom: 40px;
+}
+
+.result-box {
+    background: linear-gradient(135deg,#111827,#1e293b);
+    border-radius: 30px;
+    padding: 40px;
+    text-align: center;
+    border: 1px solid rgba(0,255,170,0.25);
+    box-shadow: 0 0 35px rgba(0,255,170,0.15);
     margin-bottom: 30px;
+}
+
+.prediction-text {
+    font-size: 65px;
+    font-weight: 900;
+    color: white;
+    text-shadow: 0 0 25px rgba(0,255,170,0.7);
+}
+
+.confidence-text {
+    color: #7CFFB2;
+    font-size: 24px;
+    font-weight: 600;
 }
 
 .card {
     background: rgba(255,255,255,0.05);
-    padding: 25px;
     border-radius: 20px;
-    border: 1px solid rgba(255,255,255,0.08);
-    box-shadow: 0 0 20px rgba(0,255,170,0.08);
+    padding: 20px;
     margin-bottom: 20px;
-}
-
-.result-card {
-    background: linear-gradient(135deg, #0f172a, #111827);
-    border-radius: 25px;
-    padding: 30px;
-    text-align: center;
-    border: 1px solid rgba(0,255,170,0.25);
-    box-shadow: 0 0 25px rgba(0,255,170,0.15);
-}
-
-.result-label {
-    color: #7CFFB2;
-    font-size: 22px;
-    font-weight: 600;
-}
-
-.result-prediction {
-    font-size: 48px;
-    font-weight: 900;
-    color: white;
-}
-
-.metric-card {
-    background: rgba(255,255,255,0.04);
-    padding: 18px;
-    border-radius: 18px;
-    margin-bottom: 15px;
+    border: 1px solid rgba(255,255,255,0.08);
 }
 
 .stButton>button {
     width: 100%;
+    height: 55px;
+    border-radius: 15px;
+    border: none;
     background: linear-gradient(90deg,#00ffae,#00c3ff);
     color: black;
-    border-radius: 15px;
     font-weight: bold;
-    height: 55px;
-    border: none;
     font-size: 18px;
 }
 
 .stDownloadButton>button {
     width: 100%;
-    border-radius: 15px;
     height: 50px;
+    border-radius: 15px;
     font-weight: bold;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-# =========================================
-# LOAD MODEL FILES
-# =========================================
+# =====================================================
+# LOAD FILES
+# =====================================================
 
 model = joblib.load("heart_sound_rf_model.pkl")
 scaler = joblib.load("scaler.pkl")
 le = joblib.load("label_encoder.pkl")
 
-# =========================================
+# =====================================================
 # PREPROCESSING
-# =========================================
+# =====================================================
 
 def preprocess_signal(file_path, duration=5):
 
@@ -146,9 +139,9 @@ def preprocess_signal(file_path, duration=5):
 
     return signal, sr
 
-# =========================================
+# =====================================================
 # FEATURE EXTRACTION
-# =========================================
+# =====================================================
 
 def extract_features(signal, sr):
 
@@ -186,13 +179,13 @@ def extract_features(signal, sr):
 
     return features
 
-# =========================================
-# PDF REPORT GENERATION
-# =========================================
+# =====================================================
+# PDF REPORT
+# =====================================================
 
 def generate_pdf(prediction, results):
 
-    pdf_path = "HeartSound_Report.pdf"
+    pdf_path = "Heart_Report.pdf"
 
     doc = SimpleDocTemplate(
         pdf_path,
@@ -230,6 +223,7 @@ def generate_pdf(prediction, results):
     table_data = [["Condition","Probability"]]
 
     for cls, prob in results:
+
         table_data.append([
             cls,
             f"{prob*100:.2f}%"
@@ -250,9 +244,9 @@ def generate_pdf(prediction, results):
 
     return pdf_path
 
-# =========================================
+# =====================================================
 # HEADER
-# =========================================
+# =====================================================
 
 st.markdown("""
 <div class="main-title">
@@ -266,9 +260,9 @@ AI-powered PCG Signal Analysis & Abnormality Detection System
 </div>
 """, unsafe_allow_html=True)
 
-# =========================================
+# =====================================================
 # SIDEBAR
-# =========================================
+# =====================================================
 
 with st.sidebar:
 
@@ -279,9 +273,20 @@ with st.sidebar:
         type=["wav"]
     )
 
-# =========================================
+    st.markdown("---")
+
+    st.markdown("""
+    ### 🩺 About
+    
+    AI-powered phonocardiogram (PCG)
+    analysis system for detecting
+    abnormal heart sounds using
+    machine learning.
+    """)
+
+# =====================================================
 # MAIN LOGIC
-# =========================================
+# =====================================================
 
 if uploaded_file is not None:
 
@@ -317,42 +322,35 @@ if uploaded_file is not None:
 
     confidence = results[0][1] * 100
 
-    # =========================================
+    # =====================================================
     # RESULT CARD
-    # =========================================
+    # =====================================================
 
     st.markdown(f"""
-    <div class="result-card">
+    <div class="result-box">
 
-        <div class="result-label">
-            🫀 Predicted Heart Condition
+        <h1 style="color:#7CFFB2;">
+        🫀 Predicted Heart Condition
+        </h1>
+
+        <div class="prediction-text">
+        {predicted_label.upper()}
         </div>
 
-        <div style="
-            font-size:60px;
-            font-weight:900;
-            color:#ffffff;
-            margin-top:20px;
-            margin-bottom:20px;
-            text-shadow:0 0 25px rgba(0,255,170,0.6);
-        ">
-            {predicted_label.upper()}
-        </div>
+        <br>
 
-        <div style="
-            font-size:24px;
-            color:#7CFFB2;
-            font-weight:600;
-        ">
-            Confidence Score: {confidence:.2f}%
+        <div class="confidence-text">
+        Confidence Score: {confidence:.2f}%
         </div>
 
     </div>
     """, unsafe_allow_html=True)
 
-    # =========================================
-    # WAVEFORM
-    # =========================================
+    # =====================================================
+    # CHARTS
+    # =====================================================
+
+    col1, col2 = st.columns(2)
 
     with col1:
 
@@ -366,13 +364,9 @@ if uploaded_file is not None:
             ax=ax
         )
 
-        ax.set_title("Preprocessed PCG Signal")
+        ax.set_title("Preprocessed Heart Sound")
 
         st.pyplot(fig)
-
-    # =========================================
-    # SPECTROGRAM
-    # =========================================
 
     with col2:
 
@@ -398,26 +392,26 @@ if uploaded_file is not None:
 
         st.pyplot(fig2)
 
-    # =========================================
-    # TOP PREDICTIONS
-    # =========================================
+    # =====================================================
+    # PROBABILITIES
+    # =====================================================
 
-    st.markdown("## 🏆 Top Predictions")
+    st.markdown("## 🏆 Prediction Probabilities")
 
     for cls, prob in results:
 
         st.markdown(f"""
-        <div class="metric-card">
-        <b>{cls.upper()}</b><br>
-        {prob*100:.2f}% probability
+        <div class="card">
+        <h3>{cls.upper()}</h3>
+        <h4>{prob*100:.2f}% probability</h4>
         </div>
         """, unsafe_allow_html=True)
 
         st.progress(float(prob))
 
-    # =========================================
-    # ADVISORY
-    # =========================================
+    # =====================================================
+    # HEALTH ADVISORY
+    # =====================================================
 
     st.markdown("## 🩺 AI Health Advisory")
 
@@ -438,17 +432,17 @@ if uploaded_file is not None:
         by healthcare professional.
         """)
 
-    # =========================================
+    # =====================================================
     # AUDIO PLAYER
-    # =========================================
+    # =====================================================
 
     st.markdown("## 🔊 Uploaded Audio")
 
     st.audio(uploaded_file)
 
-    # =========================================
-    # PDF REPORT
-    # =========================================
+    # =====================================================
+    # PDF DOWNLOAD
+    # =====================================================
 
     pdf_path = generate_pdf(
         predicted_label,
@@ -460,6 +454,6 @@ if uploaded_file is not None:
         st.download_button(
             label="📥 Download Medical Report",
             data=f,
-            file_name="HeartSound_Report.pdf",
+            file_name="Heart_Report.pdf",
             mime="application/pdf"
         )
