@@ -4,9 +4,7 @@ import librosa
 import joblib
 import soundfile as sf
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import warnings
-import io
 import os
 import tempfile
 
@@ -23,7 +21,7 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────
-# CUSTOM CSS  –  deep navy / crimson / gold
+# CUSTOM CSS
 # ─────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -36,18 +34,43 @@ html, body, [data-testid="stAppViewContainer"] {
     font-family: 'DM Sans', sans-serif;
 }
 
+/* ── Hide ONLY Streamlit branding — NOT the sidebar toggle ── */
+#MainMenu { visibility: hidden; }
+footer    { visibility: hidden; }
+[data-testid="stToolbar"] { visibility: hidden; }
+
+/* ── Sidebar background ── */
 [data-testid="stSidebar"] {
     background: #080f1f !important;
     border-right: 1px solid #1a2540;
 }
 
-/* ── Hide Streamlit chrome ── */
-#MainMenu, footer, header { visibility: hidden; }
+/* ── Make sidebar collapse button clearly visible ── */
+[data-testid="stSidebarCollapseButton"] {
+    background: #0f1e35 !important;
+    border: 1px solid #1a3060 !important;
+    border-radius: 8px !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+[data-testid="stSidebarCollapseButton"]:hover {
+    background: #1a2e50 !important;
+    border-color: #d4af37 !important;
+}
 
-/* ── Lock sidebar open — hide the collapse/expand toggle ── */
-[data-testid="collapsedControl"],
-button[kind="header"],
-[data-testid="stSidebarCollapseButton"] { display: none !important; }
+/* ── collapsedControl = the arrow that reopens sidebar when collapsed ── */
+[data-testid="collapsedControl"] {
+    background: #0f1e35 !important;
+    border: 1px solid #1a3060 !important;
+    border-radius: 0 8px 8px 0 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: flex !important;
+}
+[data-testid="collapsedControl"]:hover {
+    background: #1a2e50 !important;
+    border-color: #d4af37 !important;
+}
 
 /* ── Hero banner ── */
 .hero {
@@ -202,20 +225,6 @@ button[kind="header"],
 }
 .info-pill strong { color: #d4af37; }
 
-/* ── Class descriptions ── */
-.class-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    background: #0f1e35;
-    border: 1px solid #1a2a48;
-    border-radius: 8px;
-    padding: 0.45rem 0.8rem;
-    font-size: 0.8rem;
-    color: #aabbd4;
-    margin: 0.25rem;
-}
-
 /* ── Upload zone ── */
 [data-testid="stFileUploader"] {
     background: #080f1f !important;
@@ -258,7 +267,6 @@ button[kind="header"],
 }
 .metric-key {
     font-size: 0.75rem;
-    color: #5566880;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: #5a6e90;
@@ -268,7 +276,7 @@ button[kind="header"],
 /* ── Divider ── */
 hr { border-color: #1a2540 !important; }
 
-/* ── Waveform plot background ── */
+/* ── Plots ── */
 .stPlotlyChart, .stpyplot { background: transparent !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -279,48 +287,33 @@ hr { border-color: #1a2540 !important; }
 # ─────────────────────────────────────────────
 @st.cache_resource
 def load_models():
-    base = os.path.dirname(__file__)
+    base    = os.path.dirname(__file__)
     model   = joblib.load(os.path.join(base, "heart_sound_rf_model.pkl"))
     scaler  = joblib.load(os.path.join(base, "scaler.pkl"))
     encoder = joblib.load(os.path.join(base, "label_encoder.pkl"))
     return model, scaler, encoder
 
 model, scaler, label_encoder = load_models()
-CLASS_NAMES = list(label_encoder.classes_)          # ['artifact','extrahls','extrastole','murmur','normal']
+CLASS_NAMES = list(label_encoder.classes_)
 
 
 # ─────────────────────────────────────────────
 # FEATURE EXTRACTION
 # ─────────────────────────────────────────────
-def extract_features(audio_path: str, sr: int = 22050, n_mfcc: int = 13) -> np.ndarray:
-    """
-    Extract 24 features from a heart-sound audio file.
-    Matches the training pipeline: 13 MFCCs (mean) + 13 MFCCs (std)
-    then trimmed / padded to 24 dimensions.
-    """
+def extract_features(audio_path: str, sr: int = 22050, n_mfcc: int = 13):
     y, _ = librosa.load(audio_path, sr=sr, mono=True)
-    # Normalise amplitude
     if y.max() != 0:
         y = y / np.max(np.abs(y))
 
     mfcc        = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=n_mfcc)
-    mfcc_mean   = np.mean(mfcc, axis=1)     # 13 values
-    mfcc_std    = np.std(mfcc, axis=1)      # 13 values
-
-    chroma      = librosa.feature.chroma_stft(y=y, sr=sr)
-    chroma_mean = np.mean(chroma)           # 1 value
-
-    zcr         = np.mean(librosa.feature.zero_crossing_rate(y))   # 1 value
-    rms         = np.mean(librosa.feature.rms(y=y))                # 1 value
+    mfcc_mean   = np.mean(mfcc, axis=1)
+    mfcc_std    = np.std(mfcc, axis=1)
+    chroma_mean = np.mean(librosa.feature.chroma_stft(y=y, sr=sr))
+    zcr         = np.mean(librosa.feature.zero_crossing_rate(y))
+    rms         = np.mean(librosa.feature.rms(y=y))
 
     raw = np.concatenate([mfcc_mean, mfcc_std, [chroma_mean], [zcr], [rms]])
-
-    # Pad / trim to exactly 24 features
-    if len(raw) < 24:
-        raw = np.pad(raw, (0, 24 - len(raw)))
-    else:
-        raw = raw[:24]
-
+    raw = np.pad(raw, (0, max(0, 24 - len(raw))))[:24]
     return raw, y, sr
 
 
@@ -333,17 +326,15 @@ def predict(features: np.ndarray):
 
 
 # ─────────────────────────────────────────────
-# WAVEFORM PLOT
+# PLOT HELPERS
 # ─────────────────────────────────────────────
-def plot_waveform(y: np.ndarray, sr: int):
-    fig, ax = plt.subplots(figsize=(10, 2.5))
+def plot_waveform(y, sr, title="Waveform", color="#c81e3c"):
+    fig, ax = plt.subplots(figsize=(10, 2.4))
     fig.patch.set_facecolor('#050d1a')
     ax.set_facecolor('#080f1f')
-
     times = np.linspace(0, len(y) / sr, len(y))
-    ax.plot(times, y, color='#c81e3c', linewidth=0.7, alpha=0.9)
-    ax.fill_between(times, y, 0, color='#c81e3c', alpha=0.08)
-
+    ax.plot(times, y, color=color, linewidth=0.7, alpha=0.9)
+    ax.fill_between(times, y, 0, color=color, alpha=0.08)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_color('#1a2a48')
@@ -351,22 +342,21 @@ def plot_waveform(y: np.ndarray, sr: int):
     ax.tick_params(colors='#5a6e90', labelsize=8)
     ax.set_xlabel("Time (s)", color='#5a6e90', fontsize=9)
     ax.set_ylabel("Amplitude", color='#5a6e90', fontsize=9)
-    ax.set_title("Waveform", color='#8899bb', fontsize=10, pad=8)
+    ax.set_title(title, color='#8899bb', fontsize=10, pad=8)
     plt.tight_layout()
     return fig
 
 
-def plot_spectrogram(y: np.ndarray, sr: int):
+def plot_spectrogram(y, sr):
     fig, ax = plt.subplots(figsize=(10, 2.5))
     fig.patch.set_facecolor('#050d1a')
     ax.set_facecolor('#080f1f')
-
-    D = librosa.amplitude_to_db(np.abs(librosa.stft(y)), ref=np.max)
+    D   = librosa.amplitude_to_db(np.abs(librosa.stft(y)), ref=np.max)
     img = librosa.display.specshow(D, sr=sr, x_axis='time', y_axis='hz',
                                    ax=ax, cmap='inferno')
-    fig.colorbar(img, ax=ax, format='%+2.0f dB',
-                 label='dB').ax.yaxis.label.set_color('#5a6e90')
-
+    cb  = fig.colorbar(img, ax=ax, format='%+2.0f dB')
+    cb.ax.yaxis.label.set_color('#5a6e90')
+    cb.ax.tick_params(colors='#5a6e90')
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_color('#1a2a48')
@@ -377,6 +367,17 @@ def plot_spectrogram(y: np.ndarray, sr: int):
     ax.set_title("Spectrogram", color='#8899bb', fontsize=10, pad=8)
     plt.tight_layout()
     return fig
+
+
+def remove_noise(y, sr):
+    n_noise      = int(0.1 * sr)
+    noise_sample = y[:n_noise] if len(y) > n_noise else y
+    D_full       = librosa.stft(y)
+    D_noise      = librosa.stft(noise_sample, n_fft=(D_full.shape[0] - 1) * 2)
+    noise_mag    = np.mean(np.abs(D_noise), axis=1, keepdims=True)
+    D_clean_mag  = np.maximum(np.abs(D_full) - 2.0 * noise_mag, 0)
+    D_clean      = D_clean_mag * np.exp(1j * np.angle(D_full))
+    return librosa.istft(D_clean, length=len(y))
 
 
 # ─────────────────────────────────────────────
@@ -403,33 +404,37 @@ with st.sidebar:
 
     conditions = {
         "🟢 Normal": (
-            "Your heart sounds healthy! A normal heart makes two clear sounds — often described as "
-            "'lub-dub' — with every beat. This means blood is flowing smoothly through your heart valves "
-            "and everything is working as it should. No cause for concern here."
+            "Great news — your heart sounds are within the healthy range! "
+            "A normal heart makes two clear sounds with every beat, often described as 'lub-dub'. "
+            "This means blood is flowing smoothly through your heart valves and everything is "
+            "working just as it should. No cause for concern here at all."
         ),
         "🔴 Murmur": (
-            "A heart murmur is simply an extra or unusual whooshing sound between the normal heartbeats. "
-            "Many people live with murmurs their whole lives without any problem — they can be completely harmless. "
-            "Sometimes they happen due to the heart valves not closing perfectly. A doctor can easily check "
-            "whether it needs any attention or not."
+            "A heart murmur simply means an extra whooshing or swishing sound was heard between "
+            "the normal heartbeats. Many people have murmurs their entire lives without any issue — "
+            "they can be completely harmless. They often happen when blood flows a little turbulently "
+            "through a valve. A doctor can quickly determine whether it needs any follow-up or not."
         ),
         "🟡 Extrastole": (
-            "This means the heart produced an extra beat that came a little earlier than expected — "
-            "like a small hiccup in the rhythm. Most people experience this occasionally and may feel it as "
-            "a brief flutter or 'skipped beat' in their chest. It's usually harmless, especially in otherwise "
-            "healthy individuals, but worth mentioning to your doctor."
+            "This means the heart produced an extra beat slightly earlier than expected — "
+            "a bit like a small hiccup in the rhythm. Most people experience this occasionally "
+            "and may notice it as a brief flutter or a 'skipped beat' in their chest. "
+            "It is usually harmless, especially in healthy individuals, but it is always "
+            "a good idea to mention it to your doctor."
         ),
         "🟠 Extrahls": (
-            "An extra heart sound was detected — sometimes called an S3 or S4 sound. Think of it as "
-            "an additional quiet 'thud' heard alongside the normal heartbeat. This can sometimes happen "
-            "when the heart is working a bit harder than usual. It is not always a problem, but a doctor "
-            "should take a listen to understand the context better."
+            "An extra heart sound was detected alongside the usual heartbeat — "
+            "sometimes referred to as an S3 or S4 sound by doctors. Think of it as a quiet "
+            "additional 'thud' in the rhythm. This can sometimes occur when the heart is "
+            "working slightly harder than usual. It is not always a sign of a problem, "
+            "but a doctor should listen carefully to understand the full picture."
         ),
         "⚫ Artifact": (
-            "The recording picked up sounds that aren't coming from the heart — like movement noise, "
-            "clothing rubbing against the microphone, or background sounds. This doesn't tell us anything "
-            "about your heart health. Try recording again in a quiet place with the device held steady "
-            "for a cleaner result."
+            "The recording appears to have picked up sounds that are not coming from the heart — "
+            "such as movement noise, clothing rustling against the mic, or background sounds in the room. "
+            "This result does not tell us anything about your heart health. "
+            "Try recording again in a quiet place with the device held still "
+            "and you should get a clearer result."
         ),
     }
     for name, desc in conditions.items():
@@ -473,8 +478,7 @@ with col_upload:
     if uploaded:
         st.audio(uploaded, format="audio/wav")
 
-        # Audio metadata (quick peek)
-        with tempfile.NamedTemporaryFile(suffix=f".{uploaded.name.split('.')[-1]}", delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             tmp.write(uploaded.getvalue())
             tmp_path = tmp.name
 
@@ -491,7 +495,7 @@ with col_upload:
         with m2:
             st.markdown(f"""
             <div class='metric-tile'>
-                <div class='metric-val'>{sr_raw//1000} kHz</div>
+                <div class='metric-val'>{sr_raw // 1000} kHz</div>
                 <div class='metric-key'>Sample Rate</div>
             </div>""", unsafe_allow_html=True)
 
@@ -501,7 +505,6 @@ with col_upload:
         analyse_btn = False
         tmp_path    = None
 
-        # Placeholder instructions
         st.markdown("""
         <div class='card' style='text-align:center;padding:2rem;'>
             <div style='font-size:3rem;margin-bottom:1rem;'>🎙️</div>
@@ -542,7 +545,6 @@ with col_result:
         </div>
         """, unsafe_allow_html=True)
 
-        # ── Per-class probability bars (sorted descending) ──
         st.markdown("<div class='card-title' style='margin-top:1rem;'>Class Probabilities</div>",
                     unsafe_allow_html=True)
 
@@ -562,8 +564,7 @@ with col_result:
             <div class='prob-row'>
                 <span class='prob-label'>{cls}</span>
                 <div class='prob-bar-wrap'>
-                    <div class='prob-bar-fill'
-                         style='width:{pct:.1f}%;background:{color};'></div>
+                    <div class='prob-bar-fill' style='width:{pct:.1f}%;background:{color};'></div>
                 </div>
                 <span class='prob-pct'>{pct:.1f}%</span>
             </div>
@@ -582,7 +583,7 @@ with col_result:
 
 
 # ─────────────────────────────────────────────
-# VISUALISATIONS (shown after analysis)
+# VISUALISATIONS
 # ─────────────────────────────────────────────
 if uploaded and analyse_btn and 'y_sig' in dir():
     st.markdown("---")
@@ -592,41 +593,18 @@ if uploaded and analyse_btn and 'y_sig' in dir():
     tab1, tab2 = st.tabs(["🌊 Waveforms", "🎨 Spectrogram"])
 
     with tab1:
-        # ── Original waveform ──
         st.markdown("<p style='color:#8899bb;font-size:0.85rem;margin-bottom:0.3rem;'>"
                     "📍 Original Recording</p>", unsafe_allow_html=True)
-        fig_orig = plot_waveform(y_sig, sr_sig)
+        fig_orig = plot_waveform(y_sig, sr_sig, title="Original Waveform", color="#c81e3c")
         st.pyplot(fig_orig, use_container_width=True)
         plt.close(fig_orig)
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # ── Noise-removed waveform ──
         st.markdown("<p style='color:#8899bb;font-size:0.85rem;margin-bottom:0.3rem;'>"
                     "✨ After Noise Removal</p>", unsafe_allow_html=True)
-
-        # Spectral gating / simple noise reduction via spectral subtraction
-        # Estimate noise from first 0.1s, subtract from full signal STFT
-        n_noise = int(0.1 * sr_sig)
-        noise_sample = y_sig[:n_noise] if len(y_sig) > n_noise else y_sig
-        D_full  = librosa.stft(y_sig)
-        D_noise = librosa.stft(noise_sample, n_fft=D_full.shape[0]*2 - 2)
-
-        # Noise magnitude profile (mean across time)
-        noise_mag = np.mean(np.abs(D_noise), axis=1, keepdims=True)
-        # Spectral subtraction with over-subtraction factor
-        alpha = 2.0
-        D_clean_mag = np.maximum(np.abs(D_full) - alpha * noise_mag, 0)
-        D_clean = D_clean_mag * np.exp(1j * np.angle(D_full))
-        y_clean = librosa.istft(D_clean, length=len(y_sig))
-
-        fig_clean = plot_waveform(y_clean, sr_sig)
-        # Override title
-        fig_clean.axes[0].set_title("Waveform  (Noise Removed)", color='#8899bb',
-                                    fontsize=10, pad=8)
-        # Tint the clean signal in a teal/green colour
-        fig_clean.axes[0].lines[0].set_color('#17c3b2')
-        fig_clean.axes[0].collections[0].set_facecolor('#17c3b2')
+        y_clean   = remove_noise(y_sig, sr_sig)
+        fig_clean = plot_waveform(y_clean, sr_sig, title="Waveform — Noise Removed", color="#17c3b2")
         st.pyplot(fig_clean, use_container_width=True)
         plt.close(fig_clean)
 
@@ -637,7 +615,7 @@ if uploaded and analyse_btn and 'y_sig' in dir():
 
 
 # ─────────────────────────────────────────────
-# DISCLAIMER FOOTER
+# FOOTER
 # ─────────────────────────────────────────────
 st.markdown("---")
 st.markdown("""
