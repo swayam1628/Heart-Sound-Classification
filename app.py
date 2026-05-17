@@ -246,7 +246,7 @@ html, body, [data-testid="stAppViewContainer"] {
     text-align: center;
 }
 .metric-val {
-    font-family: 'Playfair Display', serif;
+    font-family: 'DM Sans', sans-serif;
     font-size: 1.8rem;
     font-weight: 700;
     color: #d4af37;
@@ -389,7 +389,6 @@ with st.sidebar:
     st.markdown("**Model Overview**")
     st.markdown("""
     <div class='info-pill'>🤖 <strong>Algorithm:</strong> Random Forest</div>
-    <div class='info-pill'>🌲 <strong>Estimators:</strong> 100 trees</div>
     <div class='info-pill'>📐 <strong>Features:</strong> 24 (MFCC + audio)</div>
     <div class='info-pill'>🎯 <strong>Classes:</strong> 5 categories</div>
     """, unsafe_allow_html=True)
@@ -398,11 +397,35 @@ with st.sidebar:
     st.markdown("**Detectable Conditions**")
 
     conditions = {
-        "🟢 Normal":      "Healthy heart sounds — regular S1/S2 pattern.",
-        "🔴 Murmur":      "Turbulent blood flow; may indicate valve issues.",
-        "🟡 Extrastole":  "Extra heartbeat (premature contraction).",
-        "🟠 Extrahls":    "Extra heart sounds (S3/S4 gallop).",
-        "⚫ Artifact":    "Recording noise or non-cardiac sound.",
+        "🟢 Normal": (
+            "Your heart sounds healthy! A normal heart makes two clear sounds — often described as "
+            "'lub-dub' — with every beat. This means blood is flowing smoothly through your heart valves "
+            "and everything is working as it should. No cause for concern here."
+        ),
+        "🔴 Murmur": (
+            "A heart murmur is simply an extra or unusual whooshing sound between the normal heartbeats. "
+            "Many people live with murmurs their whole lives without any problem — they can be completely harmless. "
+            "Sometimes they happen due to the heart valves not closing perfectly. A doctor can easily check "
+            "whether it needs any attention or not."
+        ),
+        "🟡 Extrastole": (
+            "This means the heart produced an extra beat that came a little earlier than expected — "
+            "like a small hiccup in the rhythm. Most people experience this occasionally and may feel it as "
+            "a brief flutter or 'skipped beat' in their chest. It's usually harmless, especially in otherwise "
+            "healthy individuals, but worth mentioning to your doctor."
+        ),
+        "🟠 Extrahls": (
+            "An extra heart sound was detected — sometimes called an S3 or S4 sound. Think of it as "
+            "an additional quiet 'thud' heard alongside the normal heartbeat. This can sometimes happen "
+            "when the heart is working a bit harder than usual. It is not always a problem, but a doctor "
+            "should take a listen to understand the context better."
+        ),
+        "⚫ Artifact": (
+            "The recording picked up sounds that aren't coming from the heart — like movement noise, "
+            "clothing rubbing against the microphone, or background sounds. This doesn't tell us anything "
+            "about your heart health. Try recording again in a quiet place with the device held steady "
+            "for a cleaner result."
+        ),
     }
     for name, desc in conditions.items():
         with st.expander(name):
@@ -438,8 +461,8 @@ with col_upload:
     st.markdown("<div class='card-title'>📁 Upload Audio</div>", unsafe_allow_html=True)
     uploaded = st.file_uploader(
         label="Drag & drop or click to browse",
-        type=["wav", "mp3", "flac", "ogg", "m4a"],
-        help="Supported: WAV, MP3, FLAC, OGG, M4A",
+        type=["wav"],
+        help="Supported format: WAV only",
     )
 
     if uploaded:
@@ -453,7 +476,7 @@ with col_upload:
         y_raw, sr_raw = librosa.load(tmp_path, sr=None)
         duration = len(y_raw) / sr_raw
 
-        m1, m2, m3 = st.columns(3)
+        m1, m2 = st.columns(2)
         with m1:
             st.markdown(f"""
             <div class='metric-tile'>
@@ -463,14 +486,8 @@ with col_upload:
         with m2:
             st.markdown(f"""
             <div class='metric-tile'>
-                <div class='metric-val'>{sr_raw//1000}k</div>
+                <div class='metric-val'>{sr_raw//1000} kHz</div>
                 <div class='metric-key'>Sample Rate</div>
-            </div>""", unsafe_allow_html=True)
-        with m3:
-            st.markdown(f"""
-            <div class='metric-tile'>
-                <div class='metric-val'>{len(y_raw)//1000}K</div>
-                <div class='metric-key'>Samples</div>
             </div>""", unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -484,7 +501,7 @@ with col_upload:
         <div class='card' style='text-align:center;padding:2rem;'>
             <div style='font-size:3rem;margin-bottom:1rem;'>🎙️</div>
             <p style='color:#5a6e90;font-size:0.9rem;margin:0;'>
-                Upload a <strong style='color:#8899bb;'>WAV / MP3 / FLAC</strong> heart sound recording<br>
+                Upload a <strong style='color:#8899bb;'>.WAV</strong> heart sound recording<br>
                 to begin AI-powered classification.
             </p>
         </div>
@@ -520,7 +537,7 @@ with col_result:
         </div>
         """, unsafe_allow_html=True)
 
-        # ── Per-class probability bars ──
+        # ── Per-class probability bars (sorted descending) ──
         st.markdown("<div class='card-title' style='margin-top:1rem;'>Class Probabilities</div>",
                     unsafe_allow_html=True)
 
@@ -532,7 +549,8 @@ with col_result:
             "artifact":   "#9b59b6",
         }
 
-        for cls, prob in zip(CLASS_NAMES, probabilities):
+        sorted_pairs = sorted(zip(CLASS_NAMES, probabilities), key=lambda x: x[1], reverse=True)
+        for cls, prob in sorted_pairs:
             pct   = prob * 100
             color = bar_colors.get(cls, "#d4af37")
             st.markdown(f"""
@@ -566,32 +584,51 @@ if uploaded and analyse_btn and 'y_sig' in dir():
     st.markdown("<div class='card-title' style='font-size:1.2rem;'>🔬 Signal Visualisation</div>",
                 unsafe_allow_html=True)
 
-    tab1, tab2 = st.tabs(["🌊 Waveform", "🎨 Spectrogram"])
+    tab1, tab2 = st.tabs(["🌊 Waveforms", "🎨 Spectrogram"])
+
     with tab1:
-        fig_w = plot_waveform(y_sig, sr_sig)
-        st.pyplot(fig_w, use_container_width=True)
-        plt.close(fig_w)
+        # ── Original waveform ──
+        st.markdown("<p style='color:#8899bb;font-size:0.85rem;margin-bottom:0.3rem;'>"
+                    "📍 Original Recording</p>", unsafe_allow_html=True)
+        fig_orig = plot_waveform(y_sig, sr_sig)
+        st.pyplot(fig_orig, use_container_width=True)
+        plt.close(fig_orig)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # ── Noise-removed waveform ──
+        st.markdown("<p style='color:#8899bb;font-size:0.85rem;margin-bottom:0.3rem;'>"
+                    "✨ After Noise Removal</p>", unsafe_allow_html=True)
+
+        # Spectral gating / simple noise reduction via spectral subtraction
+        # Estimate noise from first 0.1s, subtract from full signal STFT
+        n_noise = int(0.1 * sr_sig)
+        noise_sample = y_sig[:n_noise] if len(y_sig) > n_noise else y_sig
+        D_full  = librosa.stft(y_sig)
+        D_noise = librosa.stft(noise_sample, n_fft=D_full.shape[0]*2 - 2)
+
+        # Noise magnitude profile (mean across time)
+        noise_mag = np.mean(np.abs(D_noise), axis=1, keepdims=True)
+        # Spectral subtraction with over-subtraction factor
+        alpha = 2.0
+        D_clean_mag = np.maximum(np.abs(D_full) - alpha * noise_mag, 0)
+        D_clean = D_clean_mag * np.exp(1j * np.angle(D_full))
+        y_clean = librosa.istft(D_clean, length=len(y_sig))
+
+        fig_clean = plot_waveform(y_clean, sr_sig)
+        # Override title
+        fig_clean.axes[0].set_title("Waveform  (Noise Removed)", color='#8899bb',
+                                    fontsize=10, pad=8)
+        # Tint the clean signal in a teal/green colour
+        fig_clean.axes[0].lines[0].set_color('#17c3b2')
+        fig_clean.axes[0].collections[0].set_facecolor('#17c3b2')
+        st.pyplot(fig_clean, use_container_width=True)
+        plt.close(fig_clean)
+
     with tab2:
         fig_s = plot_spectrogram(y_sig, sr_sig)
         st.pyplot(fig_s, use_container_width=True)
         plt.close(fig_s)
-
-    # ── MFCC heatmap ──
-    st.markdown("<div class='card-title' style='margin-top:1rem;'>🎛️ MFCC Feature Map</div>",
-                unsafe_allow_html=True)
-    fig_m, ax_m = plt.subplots(figsize=(10, 2.8))
-    fig_m.patch.set_facecolor('#050d1a')
-    ax_m.set_facecolor('#080f1f')
-    mfcc_map = librosa.feature.mfcc(y=y_sig, sr=sr_sig, n_mfcc=13)
-    img2 = librosa.display.specshow(mfcc_map, x_axis='time', ax=ax_m, cmap='magma')
-    fig_m.colorbar(img2, ax=ax_m)
-    ax_m.set_title("MFCC Coefficients (1–13)", color='#8899bb', fontsize=10)
-    ax_m.tick_params(colors='#5a6e90', labelsize=8)
-    for sp in ax_m.spines.values():
-        sp.set_color('#1a2a48')
-    plt.tight_layout()
-    st.pyplot(fig_m, use_container_width=True)
-    plt.close(fig_m)
 
 
 # ─────────────────────────────────────────────
